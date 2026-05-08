@@ -11,7 +11,7 @@ from datetime import datetime
 import openpyxl
 
 app = Flask(__name__)
-app.secret_key = 'claro-fortinet-2026'
+app.secret_key = os.environ.get('SECRET_KEY', 'claro-fortinet-2026')
 DB_PATH = os.path.join(os.path.dirname(__file__), 'sistema.db')
 BACKUP_DIR = os.path.join(os.path.dirname(__file__), 'backups')
 ALLOW_DB_RESET = os.environ.get('ALLOW_DB_RESET', '').lower() in ('1', 'true', 'yes', 'on')
@@ -23,15 +23,15 @@ USAR_POSTGRES = DATABASE_URL is not None and 'postgres' in DATABASE_URL
 if USAR_POSTGRES:
     import psycopg2
     import psycopg2.extras
-    # Render usa postgres:// mas psycopg2 precisa de postgresql://
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     print(f"🔵 Usando PostgreSQL")
 else:
     print(f"🟢 Usando SQLite: {DB_PATH}")
 
-USUARIO = 'EstratOpera'
-SENHA   = 'Bolsao26'
+# Credenciais lidas de variáveis de ambiente com fallback local
+USUARIO = os.environ.get('USUARIO', 'EstratOpera')
+SENHA   = os.environ.get('SENHA', 'Bolsao26')
 
 
 def login_required(f):
