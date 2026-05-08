@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novo Bolsão de Pontos - Claro Empresas</title>
+    <title>{% if ponto %}Editar{% else %}Novo{% endif %} Bolsão de Pontos - Claro Empresas</title>
     <link rel="stylesheet" href="/static/claro.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
         <header>
             <div class="header-left">
                 <img src="{{ url_for('static', filename='claro_empresasII.jpg') }}" alt="Claro Empresas" class="logo">
-                <h1>Novo Bolsão de Pontos</h1>
+                <h1>{% if ponto %}Editar{% else %}Novo{% endif %} Bolsão de Pontos</h1>
             </div>
             <nav>
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
@@ -33,30 +33,30 @@
                     <div class="grid-2">
                         <div class="form-group">
                             <label for="point_pack_number">Número do Pack</label>
-                            <input type="text" name="point_pack_number" required>
+                            <input type="text" name="point_pack_number" value="{{ ponto.point_pack_number or '' }}" {% if ponto %}required{% endif %}>
                         </div>
                         <div class="form-group">
                             <label for="responsavel">Responsável</label>
                             <select name="responsavel" required>
-                                <option value="" disabled selected>Selecione...</option>
-                                <option value="Delivery">Delivery</option>
-                                <option value="Projetos Especiais">Projetos Especiais</option>
-                                <option value="Produtos">Produtos</option>
+                                <option value="" {% if not ponto %}disabled selected{% endif %}>Selecione...</option>
+                                <option value="Delivery" {% if ponto and ponto.responsavel == 'Delivery' %}selected{% endif %}>Delivery</option>
+                                <option value="Projetos Especiais" {% if ponto and ponto.responsavel == 'Projetos Especiais' %}selected{% endif %}>Projetos Especiais</option>
+                                <option value="Produtos" {% if ponto and ponto.responsavel == 'Produtos' %}selected{% endif %}>Produtos</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="projetos">Projeto</label>
-                        <input type="text" name="projetos" required>
+                        <input type="text" name="projetos" value="{{ ponto.projetos or '' }}" required>
                     </div>
                     <div class="grid-3">
                         <div class="form-group">
                             <label for="pontos">Pontos</label>
-                            <input type="number" name="pontos" id="pontos" required oninput="calcRestantes()">
+                            <input type="number" name="pontos" id="pontos" value="{{ ponto.pontos or '' }}" required oninput="calcRestantes()">
                         </div>
                         <div class="form-group">
                             <label for="used_amount">Usados</label>
-                            <input type="number" name="used_amount" id="used_amount" value="0" required oninput="calcRestantes()">
+                            <input type="number" name="used_amount" id="used_amount" value="{{ ponto.used_amount or 0 }}" required oninput="calcRestantes()">
                         </div>
                         <div class="form-group">
                             <label for="remaining_amount">Restantes</label>
@@ -69,25 +69,25 @@
                     <div class="grid-3">
                         <div class="form-group">
                             <label for="registration_date">Data Registro</label>
-                            <input type="date" name="registration_date" id="registration_date" required>
+                            <input type="date" name="registration_date" id="registration_date" value="{{ ponto.registration_date or '' }}" required>
                             <small style="color:#666;font-size:12px;margin-top:4px;display:block;">Formato: AAAA-MM-DD</small>
                         </div>
                         <div class="form-group">
                             <label for="expiration_date">Data Expiração</label>
-                            <input type="date" name="expiration_date" id="expiration_date" required>
+                            <input type="date" name="expiration_date" id="expiration_date" value="{{ ponto.expiration_date or '' }}" required>
                             <small style="color:#666;font-size:12px;margin-top:4px;display:block;">Deve ser maior que data de registro</small>
                         </div>
                         <div class="form-group">
                             <label for="previsao_inicio">Previsão Início</label>
-                            <input type="date" name="previsao_inicio">
+                            <input type="date" name="previsao_inicio" value="{{ ponto.previsao_inicio or '' }}">
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="tempo_projeto_meses">Tempo Projeto (meses)</label>
-                        <input type="number" name="tempo_projeto_meses" style="max-width:250px;">
+                        <input type="number" name="tempo_projeto_meses" value="{{ ponto.tempo_projeto_meses or '' }}" style="max-width:250px;">
                     </div>
                 </div>
-                <button type="submit" class="btn-submit">Salvar Bolsão</button>
+                <button type="submit" class="btn-submit">{% if ponto %}Atualizar Bolsão{% else %}Salvar Bolsão{% endif %}</button>
             </form>
         </div>
         <footer>

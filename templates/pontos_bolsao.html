@@ -31,6 +31,7 @@
             <table>
                 <thead>
                     <tr>
+                        <th>Ações</th>
                         <th>Point Pack Number</th>
                         <th>Responsável</th>
                         <th>Projeto</th>
@@ -46,6 +47,9 @@
                 <tbody>
                     {% for ponto in pontos %}
                     <tr>
+                        <td style="text-align:center;">
+                            <a href="{{ url_for('editar_ponto_bolsao', id=ponto.id) }}" style="text-decoration:none;font-size:20px;" title="Editar registro">✏️</a>
+                        </td>
                         <td>{{ ponto.point_pack_number }}</td>
                         <td>{{ ponto.responsavel }}</td>
                         <td>{{ ponto.projetos }}</td>
@@ -59,7 +63,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="10">Nenhum pacote de pontos cadastrado.</td>
+                        <td colspan="11">Nenhum pacote de pontos cadastrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

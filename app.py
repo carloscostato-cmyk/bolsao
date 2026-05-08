@@ -195,22 +195,49 @@ def listar_pontos_bolsao():
 def novo_ponto_bolsao():
     erro = None
     if request.method == 'POST':
-        try:
-            reg_date_str = request.form['registration_date']
-            exp_date_str = request.form['expiration_date']
-            
-            reg_date = datetime.strptime(reg_date_str, '%Y-%m-%d')
-            exp_date = datetime.strptime(exp_date_str, '%Y-%m-%d')
-            
-            if exp_date <= reg_date:
-                erro = 'Data de Expiração deve ser posterior à Data de Registro.'
-                return render_template('novo_bolsao.html', erro=erro)
-            
-            if reg_date.year < 2020 or reg_date.year > 2030 or exp_date.year < 2020 or exp_date.year > 2030:
-                erro = 'Ano deve estar entre 2020 e 2030. Verifique as datas inseridas.'
-                return render_template('novo_bolsao.html', erro=erro)
-            
-            conn = get_db_connection()
+        return _salvar_ponto_bolsao(None)
+    return render_template('novo_bolsao.html', ponto=None, erro=erro)
+
+
+@app.route('/pontos_bolsao/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_ponto_bolsao(id):
+    conn = get_db_connection()
+    ponto = conn.execute('SELECT * FROM pontos_bolsao WHERE id = ?', (id,)).fetchone()
+    conn.close()
+    
+    if ponto is None:
+        return redirect(url_for('listar_pontos_bolsao'))
+    
+    erro = None
+    if request.method == 'POST':
+        return _salvar_ponto_bolsao(id)
+    
+    return render_template('novo_bolsao.html', ponto=ponto, erro=erro)
+
+
+def _salvar_ponto_bolsao(id_registro):
+    """Função compartilhada para criar ou atualizar um registro"""
+    erro = None
+    try:
+        reg_date_str = request.form['registration_date']
+        exp_date_str = request.form['expiration_date']
+        
+        reg_date = datetime.strptime(reg_date_str, '%Y-%m-%d')
+        exp_date = datetime.strptime(exp_date_str, '%Y-%m-%d')
+        
+        if exp_date <= reg_date:
+            erro = 'Data de Expiração deve ser posterior à Data de Registro.'
+            return render_template('novo_bolsao.html', ponto=None, erro=erro)
+        
+        if reg_date.year < 2020 or reg_date.year > 2030 or exp_date.year < 2020 or exp_date.year > 2030:
+            erro = 'Ano deve estar entre 2020 e 2030. Verifique as datas inseridas.'
+            return render_template('novo_bolsao.html', ponto=None, erro=erro)
+        
+        conn = get_db_connection()
+        
+        if id_registro is None:
+            # INSERIR novo registro
             conn.execute('''
                 INSERT INTO pontos_bolsao
                     (point_pack_number, responsavel, projetos, pontos, used_amount, registration_date, expiration_date, previsao_inicio, tempo_projeto_meses)
@@ -226,16 +253,39 @@ def novo_ponto_bolsao():
                 request.form.get('previsao_inicio') or None,
                 int(request.form['tempo_projeto_meses']) if request.form.get('tempo_projeto_meses') else None,
             ))
-            conn.commit()
-            conn.close()
-            backup_database('pontos_bolsao')
-            return redirect(url_for('listar_pontos_bolsao'))
-        except sqlite3.IntegrityError:
-            erro = 'Número do Pack já cadastrado. Use um número diferente.'
-        except Exception as e:
-            erro = f'Erro ao salvar: {str(e)}'
-
-    return render_template('novo_bolsao.html', erro=erro)
+        else:
+            # ATUALIZAR registro existente
+            conn.execute('''
+                UPDATE pontos_bolsao SET
+                    point_pack_number = ?, responsavel = ?, projetos = ?,
+                    pontos = ?, used_amount = ?,
+                    registration_date = ?, expiration_date = ?,
+                    previsao_inicio = ?, tempo_projeto_meses = ?
+                WHERE id = ?
+            ''', (
+                request.form['point_pack_number'],
+                request.form['responsavel'],
+                request.form['projetos'],
+                int(request.form['pontos']),
+                float(request.form.get('used_amount') or 0),
+                request.form['registration_date'],
+                request.form['expiration_date'],
+                request.form.get('previsao_inicio') or None,
+                int(request.form['tempo_projeto_meses']) if request.form.get('tempo_projeto_meses') else None,
+                id_registro,
+            ))
+        
+        conn.commit()
+        conn.close()
+        backup_database('pontos_bolsao')
+        return redirect(url_for('listar_pontos_bolsao'))
+    
+    except sqlite3.IntegrityError:
+        erro = 'Número do Pack já cadastrado. Use um número diferente.'
+        return render_template('novo_bolsao.html', ponto=None, erro=erro)
+    except Exception as e:
+        erro = f'Erro ao salvar: {str(e)}'
+        return render_template('novo_bolsao.html', ponto=None, erro=erro)
 
 # ── Pontos Utilizados ─────────────────────────────────────────────────────────
 
