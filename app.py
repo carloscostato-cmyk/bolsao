@@ -230,8 +230,8 @@ def _salvar_ponto_bolsao(id_registro):
             erro = 'Data de Expiração deve ser posterior à Data de Registro.'
             return render_template('novo_bolsao.html', ponto=None, erro=erro)
         
-        if reg_date.year < 2020 or reg_date.year > 2030 or exp_date.year < 2020 or exp_date.year > 2030:
-            erro = 'Ano deve estar entre 2020 e 2030. Verifique as datas inseridas.'
+        if reg_date.year < 2020 or reg_date.year > 2040 or exp_date.year < 2020 or exp_date.year > 2040:
+            erro = 'Ano deve estar entre 2020 e 2040. Verifique as datas inseridas.'
             return render_template('novo_bolsao.html', ponto=None, erro=erro)
         
         conn = get_db_connection()
@@ -330,15 +330,15 @@ def novo_ponto_utilizado():
             
             apl_date = datetime.strptime(apl_date_str, '%Y-%m-%d')
             
-            if apl_date.year < 2020 or apl_date.year > 2030:
-                flash('Ano da Data Aplicação deve estar entre 2020 e 2030.', 'erro')
+            if apl_date.year < 2020 or apl_date.year > 2040:
+                flash('Ano da Data Aplicação deve estar entre 2020 e 2040.', 'erro')
                 return redirect(url_for('novo_ponto_utilizado'))
             
             if fim_date_str:
                 fim_date = datetime.strptime(fim_date_str, '%Y-%m-%d')
                 
-                if fim_date.year < 2020 or fim_date.year > 2030:
-                    flash('Ano da Data Fim deve estar entre 2020 e 2030.', 'erro')
+                if fim_date.year < 2020 or fim_date.year > 2040:
+                    flash('Ano da Data Fim deve estar entre 2020 e 2040.', 'erro')
                     return redirect(url_for('novo_ponto_utilizado'))
                 
                 if fim_date <= apl_date:
