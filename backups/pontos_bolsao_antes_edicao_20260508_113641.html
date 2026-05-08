@@ -31,7 +31,6 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Ações</th>
                         <th>Point Pack Number</th>
                         <th>Responsável</th>
                         <th>Projeto</th>
@@ -47,11 +46,6 @@
                 <tbody>
                     {% for ponto in pontos %}
                     <tr>
-                        <td style="text-align:center; white-space:nowrap;">
-                            <a href="{{ url_for('editar_ponto_bolsao', id=ponto.id) }}" style="text-decoration:none;font-size:18px;" title="Editar">✏️</a>
-                            &nbsp;
-                            <a href="#" onclick="confirmarExclusao('{{ url_for('excluir_ponto_bolsao', id=ponto.id) }}', '{{ ponto.point_pack_number }}')" style="text-decoration:none;font-size:18px;color:#e60012;" title="Excluir">✕</a>
-                        </td>
                         <td>{{ ponto.point_pack_number }}</td>
                         <td>{{ ponto.responsavel }}</td>
                         <td>{{ ponto.projetos }}</td>
@@ -65,7 +59,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="11">Nenhum pacote de pontos cadastrado.</td>
+                        <td colspan="10">Nenhum pacote de pontos cadastrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -76,34 +70,5 @@
             <p>Sistema de Controle de Licenças Fortinet</p>
         </footer>
     </div>
-
-    <!-- Modal de confirmação de exclusão -->
-    <div id="modal-exclusao" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center;">
-        <div style="background:#fff; border-radius:12px; padding:32px 28px; max-width:380px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.18); text-align:center;">
-            <div style="font-size:36px; margin-bottom:12px;">⚠️</div>
-            <h3 style="margin-bottom:8px; color:#1f2933;">Confirmar Exclusão</h3>
-            <p id="modal-msg" style="color:#66737d; margin-bottom:24px; font-size:15px;"></p>
-            <div style="display:flex; gap:12px; justify-content:center;">
-                <button onclick="fecharModal()" style="padding:10px 28px; border-radius:8px; border:1px solid #dfe6ea; background:#f7f9fa; font-weight:700; cursor:pointer; font-size:14px;">Não</button>
-                <form id="form-exclusao" method="post" style="margin:0;">
-                    <button type="submit" style="padding:10px 28px; border-radius:8px; border:none; background:#e60012; color:#fff; font-weight:700; cursor:pointer; font-size:14px;">Sim, excluir</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        function confirmarExclusao(url, nome) {
-            document.getElementById('modal-msg').textContent = 'Deseja excluir o registro "' + nome + '"? Esta ação não pode ser desfeita.';
-            document.getElementById('form-exclusao').action = url;
-            document.getElementById('modal-exclusao').style.display = 'flex';
-        }
-        function fecharModal() {
-            document.getElementById('modal-exclusao').style.display = 'none';
-        }
-        document.getElementById('modal-exclusao').addEventListener('click', function(e) {
-            if (e.target === this) fecharModal();
-        });
-    </script>
 </body>
 </html>

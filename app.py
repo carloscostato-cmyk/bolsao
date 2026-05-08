@@ -673,6 +673,30 @@ def conciliacao():
     return render_template('conciliacao.html', linhas=linhas, total_base=total_base)
 
 
+@app.route('/pontos_bolsao/<int:id>/excluir', methods=['POST'])
+@login_required
+def excluir_ponto_bolsao(id):
+    conn = get_db_connection()
+    placeholder = '%s' if USAR_POSTGRES else '?'
+    execute_query(conn, f'DELETE FROM pontos_bolsao WHERE id = {placeholder}', (id,))
+    conn.commit()
+    conn.close()
+    flash('Bolsão excluído com sucesso.', 'sucesso')
+    return redirect(url_for('listar_pontos_bolsao'))
+
+
+@app.route('/pontos_utilizados/<int:id>/excluir', methods=['POST'])
+@login_required
+def excluir_ponto_utilizado(id):
+    conn = get_db_connection()
+    placeholder = '%s' if USAR_POSTGRES else '?'
+    execute_query(conn, f'DELETE FROM pontos_utilizados WHERE id = {placeholder}', (id,))
+    conn.commit()
+    conn.close()
+    flash('Registro excluído com sucesso.', 'sucesso')
+    return redirect(url_for('listar_pontos_utilizados'))
+
+
 # ── Admin ─────────────────────────────────────────────────────────────────────
 
 @app.route('/admin/limpar-banco', methods=['POST'])
