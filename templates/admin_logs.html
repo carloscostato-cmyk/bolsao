@@ -1,0 +1,5 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Logs</title><link rel="stylesheet" href="{{ url_for('static', filename='claro.css') }}"></head>
+<body><div class="container"><header><div class="header-left"><img src="{{ url_for('static', filename='claro_empresasII.jpg') }}" class="logo"><h1>Admin - Logs</h1></div><nav><a href="{{ url_for('dashboard') }}">Dashboard</a><a href="{{ url_for('admin_usuarios') }}">Usuários</a><a href="{{ url_for('admin_logs') }}" class="active">Logs</a><a href="{{ url_for('logout') }}" style="background:#2f3941;">Sair</a></nav></header>
+<main><table><thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Detalhe</th><th>IP</th></tr></thead><tbody>{% for l in logs %}<tr><td>{{ l.criado_em }}</td><td>{{ l.usuario }}</td><td>{{ l.acao }}</td><td>{{ l.detalhe }}</td><td>{{ l.ip }}</td></tr>{% endfor %}</tbody></table></main></div></body></html>

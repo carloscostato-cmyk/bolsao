@@ -18,6 +18,9 @@ from reportlab.lib.pagesizes import A4
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'claro-fortinet-2026')
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '1') == '1'
 DB_PATH = os.path.join(os.path.dirname(__file__), 'sistema.db')
 BACKUP_DIR = os.path.join(os.path.dirname(__file__), 'backups')
 ALLOW_DB_RESET = os.environ.get('ALLOW_DB_RESET', '').lower() in ('1', 'true', 'yes', 'on')
@@ -154,6 +157,29 @@ def rows_to_dicts(rows):
     return [dict_from_row(r) for r in rows]
 
 
+def mask_sensitive(value):
+    if value is None:
+        return ''
+    text = str(value)
+    if len(text) <= 4:
+        return '****'
+    return text[:2] + ('*' * (len(text) - 4)) + text[-2:]
+
+
+def write_audit_log(acao, detalhe=''):
+    try:
+        usuario = session.get('usuario', 'anonimo')
+        ip = request.remote_addr or 'unknown'
+    except RuntimeError:
+        usuario, ip = 'sistema', 'localhost'
+    conn = get_db_connection()
+    placeholder = '%s' if USAR_POSTGRES else '?'
+    execute_query(conn, f'INSERT INTO auditoria_logs (usuario, acao, detalhe, ip, criado_em) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})',
+                  (usuario, acao, detalhe, ip, datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')))
+    conn.commit()
+    conn.close()
+
+
 def init_db():
     """Cria tabelas no banco ativo (SQLite ou PostgreSQL)"""
     if USAR_POSTGRES:
@@ -192,6 +218,16 @@ def init_db():
                 description TEXT,
                 usage_date TEXT,
                 points REAL NOT NULL
+            )
+        ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS auditoria_logs (
+                id SERIAL PRIMARY KEY,
+                usuario TEXT NOT NULL,
+                acao TEXT NOT NULL,
+                detalhe TEXT,
+                ip TEXT,
+                criado_em TEXT NOT NULL
             )
         ''')
         conn.commit()
@@ -245,6 +281,16 @@ def init_db():
                 description TEXT,
                 usage_date TEXT,
                 points REAL NOT NULL
+            )
+        ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS auditoria_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                usuario TEXT NOT NULL,
+                acao TEXT NOT NULL,
+                detalhe TEXT,
+                ip TEXT,
+                criado_em TEXT NOT NULL
             )
         ''')
         conn.commit()
@@ -331,20 +377,72 @@ def login():
             session['usuario'] = usuario
             session['perfil'] = user.get('perfil', 'viewer')
             login_attempts[ip] = {'count': 0, 'locked_until': None}
+            write_audit_log('login_sucesso', f'usuario={usuario}')
             return redirect(url_for('dashboard'))
         state['count'] += 1
         if state['count'] >= MAX_LOGIN_ATTEMPTS:
             state['locked_until'] = now + timedelta(seconds=LOCKOUT_SECONDS)
             erro = 'Muitas tentativas inválidas. Login bloqueado por 15 minutos.'
+            write_audit_log('login_bloqueado', f'usuario={mask_sensitive(usuario)}')
         else:
             erro = f'Usuário ou senha incorretos. Tentativa {state["count"]} de {MAX_LOGIN_ATTEMPTS}.'
+            write_audit_log('login_falha', f'usuario={mask_sensitive(usuario)} tentativa={state["count"]}')
     return render_template('login.html', erro=erro)
 
 
 @app.route('/logout')
 def logout():
+    write_audit_log('logout', f"usuario={session.get('usuario', 'anonimo')}")
     session.clear()
     return redirect(url_for('login'))
+
+
+@app.route('/admin/usuarios', methods=['GET', 'POST'])
+@role_required('admin')
+def admin_usuarios():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        usuario = request.form['usuario'].strip()
+        senha = request.form['senha']
+        perfil = request.form['perfil']
+        senha_hash = bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        placeholder = '%s' if USAR_POSTGRES else '?'
+        try:
+            execute_query(conn, f'INSERT INTO usuarios (usuario, senha_hash, perfil, ativo) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})',
+                          (usuario, senha_hash, perfil, 1))
+            conn.commit()
+            write_audit_log('usuario_criado', f'usuario={usuario} perfil={perfil}')
+            flash('Usuário criado com sucesso.', 'sucesso')
+        except Exception:
+            flash('Não foi possível criar usuário (verifique duplicidade).', 'erro')
+    rows = fetch_all(conn, 'SELECT id, usuario, perfil, ativo FROM usuarios ORDER BY usuario')
+    conn.close()
+    return render_template('admin_usuarios.html', usuarios=rows_to_dicts(rows))
+
+
+@app.route('/admin/usuarios/<int:id>/toggle', methods=['POST'])
+@role_required('admin')
+def toggle_usuario(id):
+    conn = get_db_connection()
+    placeholder = '%s' if USAR_POSTGRES else '?'
+    row = fetch_one(conn, f'SELECT ativo, usuario FROM usuarios WHERE id = {placeholder}', (id,))
+    if row:
+        user = dict_from_row(row)
+        novo_ativo = 0 if int(user['ativo']) == 1 else 1
+        execute_query(conn, f'UPDATE usuarios SET ativo = {placeholder} WHERE id = {placeholder}', (novo_ativo, id))
+        conn.commit()
+        write_audit_log('usuario_toggle', f"usuario={user['usuario']} ativo={novo_ativo}")
+    conn.close()
+    return redirect(url_for('admin_usuarios'))
+
+
+@app.route('/admin/logs')
+@role_required('admin')
+def admin_logs():
+    conn = get_db_connection()
+    rows = fetch_all(conn, 'SELECT usuario, acao, detalhe, ip, criado_em FROM auditoria_logs ORDER BY id DESC LIMIT 200')
+    conn.close()
+    return render_template('admin_logs.html', logs=rows_to_dicts(rows))
 
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────

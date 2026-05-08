@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Usuários</title><link rel="stylesheet" href="{{ url_for('static', filename='claro.css') }}"></head>
+<body><div class="container"><header><div class="header-left"><img src="{{ url_for('static', filename='claro_empresasII.jpg') }}" class="logo"><h1>Admin - Usuários</h1></div><nav><a href="{{ url_for('dashboard') }}">Dashboard</a><a href="{{ url_for('admin_usuarios') }}" class="active">Usuários</a><a href="{{ url_for('admin_logs') }}">Logs</a><a href="{{ url_for('logout') }}" style="background:#2f3941;">Sair</a></nav></header>
+<main>
+<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="grid-3"><input name="usuario" placeholder="Usuário" required><input name="senha" type="password" placeholder="Senha" required><select name="perfil"><option value="viewer">viewer</option><option value="admin">admin</option></select></div>
+<button class="button" type="submit">Criar usuário</button></form>
+<table><thead><tr><th>Usuário</th><th>Perfil</th><th>Ativo</th><th>Ação</th></tr></thead><tbody>{% for u in usuarios %}<tr><td>{{ u.usuario }}</td><td>{{ u.perfil }}</td><td>{{ 'Sim' if u.ativo else 'Não' }}</td><td><form method="post" action="{{ url_for('toggle_usuario', id=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button" type="submit">Alternar</button></form></td></tr>{% endfor %}</tbody></table>
+</main></div></body></html>
