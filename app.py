@@ -66,6 +66,8 @@ def init_db():
             valor_pontos_dia REAL NOT NULL,
             data_aplicacao TEXT NOT NULL,
             data_fim TEXT,
+            FOREIGN KEY (bolsao_id) REFERENCES pontos_bolsao (id)
+        )
     ''')
     cur.execute('''
         CREATE TABLE IF NOT EXISTS base_conciliacao (
