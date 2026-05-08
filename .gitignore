@@ -7,11 +7,17 @@ __pycache__/
 *.tmp
 *.log
 
-# Ambiente virtual — sobe conforme solicitado
-# .venv/   ← não ignorado
+# Backups locais
+backups/
 
-# Banco de dados — sobe conforme solicitado
-# sistema.db ← não ignorado
+# Scripts de debug/teste temporários
+debug_*.py
+test_*.py
+analise_local.py
+check_*.py
+simple_check.py
+template_check.py
+debug_output.html
 
 # Sistema operacional
 .DS_Store
