@@ -25,6 +25,7 @@
         <main>
             <div class="actions">
                 <a href="{{ url_for('novo_ponto_utilizado') }}" class="button">Registrar Novo Consumo</a>
+                <a href="{{ url_for('exportar_pontos_utilizados_excel') }}" class="button" style="margin-left:8px;">Exportar Excel</a>
             </div>
 
             <div class="stats">
@@ -95,6 +96,7 @@
             <div style="display:flex; gap:12px; justify-content:center;">
                 <button onclick="fecharModal()" style="padding:10px 28px; border-radius:8px; border:1px solid #dfe6ea; background:#f7f9fa; font-weight:700; cursor:pointer; font-size:14px;">Não</button>
                 <form id="form-exclusao" method="post" style="margin:0;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" style="padding:10px 28px; border-radius:8px; border:none; background:#e60012; color:#fff; font-weight:700; cursor:pointer; font-size:14px;">Sim, excluir</button>
                 </form>
             </div>

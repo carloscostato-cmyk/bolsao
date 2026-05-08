@@ -28,6 +28,7 @@
             </div>
             {% endif %}
             <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="section">
                     <div class="section-title"><span class="section-number">1</span>Informações do Bolsão</div>
                     <div class="grid-2">

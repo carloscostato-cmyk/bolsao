@@ -2,13 +2,19 @@
 Sistema de Controle de Licenças Fortinet
 Suporte a SQLite (local) e PostgreSQL (produção/Render)
 """
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, abort, send_file
 from functools import wraps
 import sqlite3
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 import openpyxl
+import bcrypt
+import io
+import secrets
+from collections import defaultdict
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'claro-fortinet-2026')
@@ -29,9 +35,49 @@ if USAR_POSTGRES:
 else:
     print(f"🟢 Usando SQLite: {DB_PATH}")
 
-# Credenciais lidas de variáveis de ambiente com fallback local
-USUARIO = os.environ.get('USUARIO', 'EstratOpera')
-SENHA   = os.environ.get('SENHA', 'Bolsao26')
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_SECONDS = 900
+login_attempts = defaultdict(lambda: {'count': 0, 'locked_until': None})
+
+
+def _now_utc():
+    return datetime.utcnow()
+
+
+def generate_csrf_token():
+    token = session.get('_csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['_csrf_token'] = token
+    return token
+
+
+@app.context_processor
+def inject_csrf_token():
+    return dict(csrf_token=generate_csrf_token)
+
+
+@app.before_request
+def validate_csrf():
+    if request.method == 'POST':
+        token = session.get('_csrf_token')
+        form_token = request.form.get('csrf_token')
+        if not token or not form_token or token != form_token:
+            abort(400, description='Token CSRF inválido.')
+
+
+def role_required(*roles):
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            if not session.get('logado'):
+                return redirect(url_for('login'))
+            if session.get('perfil') not in roles:
+                flash('Acesso negado para o seu perfil.', 'erro')
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 def login_required(f):
@@ -208,6 +254,42 @@ def init_db():
 init_db()
 
 
+def init_users():
+    conn = get_db_connection()
+    create_sql = '''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id SERIAL PRIMARY KEY,
+            usuario TEXT NOT NULL UNIQUE,
+            senha_hash TEXT NOT NULL,
+            perfil TEXT NOT NULL DEFAULT 'admin',
+            ativo INTEGER NOT NULL DEFAULT 1
+        )
+    ''' if USAR_POSTGRES else '''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario TEXT NOT NULL UNIQUE,
+            senha_hash TEXT NOT NULL,
+            perfil TEXT NOT NULL DEFAULT 'admin',
+            ativo INTEGER NOT NULL DEFAULT 1
+        )
+    '''
+    execute_query(conn, create_sql)
+
+    usuario = os.environ.get('USUARIO', 'EstratOpera')
+    senha = os.environ.get('SENHA', 'Bolsao26')
+    senha_hash_env = os.environ.get('SENHA_HASH')
+    senha_hash = senha_hash_env.encode('utf-8') if senha_hash_env else bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt())
+    row = fetch_one(conn, 'SELECT * FROM usuarios WHERE usuario = %s' if USAR_POSTGRES else 'SELECT * FROM usuarios WHERE usuario = ?', (usuario,))
+    if not row:
+        placeholder = '%s' if USAR_POSTGRES else '?'
+        execute_query(conn, f'INSERT INTO usuarios (usuario, senha_hash, perfil, ativo) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})', (usuario, senha_hash.decode('utf-8'), 'admin', 1))
+    conn.commit()
+    conn.close()
+
+
+init_users()
+
+
 def backup_database(label='snapshot'):
     if not os.path.exists(DB_PATH):
         return None
@@ -229,10 +311,33 @@ if not USAR_POSTGRES and os.path.exists(DB_PATH):
 def login():
     erro = None
     if request.method == 'POST':
-        if request.form['usuario'] == USUARIO and request.form['senha'] == SENHA:
+        usuario = request.form['usuario'].strip()
+        senha = request.form['senha']
+        ip = request.remote_addr or 'unknown'
+        state = login_attempts[ip]
+        now = _now_utc()
+        if state['locked_until'] and now < state['locked_until']:
+            minutos = int((state['locked_until'] - now).total_seconds() // 60) + 1
+            erro = f'Bloqueado temporariamente por tentativas inválidas. Tente novamente em {minutos} minuto(s).'
+            return render_template('login.html', erro=erro)
+
+        conn = get_db_connection()
+        row = fetch_one(conn, 'SELECT * FROM usuarios WHERE usuario = %s AND ativo = 1' if USAR_POSTGRES else 'SELECT * FROM usuarios WHERE usuario = ? AND ativo = 1', (usuario,))
+        conn.close()
+        user = dict_from_row(row) if row else None
+
+        if user and bcrypt.checkpw(senha.encode('utf-8'), user['senha_hash'].encode('utf-8')):
             session['logado'] = True
+            session['usuario'] = usuario
+            session['perfil'] = user.get('perfil', 'viewer')
+            login_attempts[ip] = {'count': 0, 'locked_until': None}
             return redirect(url_for('dashboard'))
-        erro = 'Usuário ou senha incorretos.'
+        state['count'] += 1
+        if state['count'] >= MAX_LOGIN_ATTEMPTS:
+            state['locked_until'] = now + timedelta(seconds=LOCKOUT_SECONDS)
+            erro = 'Muitas tentativas inválidas. Login bloqueado por 15 minutos.'
+        else:
+            erro = f'Usuário ou senha incorretos. Tentativa {state["count"]} de {MAX_LOGIN_ATTEMPTS}.'
     return render_template('login.html', erro=erro)
 
 
@@ -700,7 +805,7 @@ def excluir_ponto_utilizado(id):
 # ── Admin ─────────────────────────────────────────────────────────────────────
 
 @app.route('/admin/limpar-banco', methods=['POST'])
-@login_required
+@role_required('admin')
 def limpar_banco():
     if not ALLOW_DB_RESET:
         flash('Limpeza do banco desabilitada neste ambiente.', 'erro')
@@ -724,6 +829,61 @@ def limpar_banco():
     conn.close()
     flash('Banco de dados limpo com sucesso!', 'sucesso')
     return redirect(url_for('dashboard'))
+
+
+@app.route('/relatorios/pontos-utilizados/exportar.xlsx')
+@login_required
+def exportar_pontos_utilizados_excel():
+    conn = get_db_connection()
+    rows = fetch_all(conn, '''
+        SELECT pu.serial_number, pu.dados_cliente, pu.product_model, pu.valor_pontos_dia, pu.data_aplicacao, pu.data_fim,
+               b.responsavel || ' (' || b.projetos || ')' as grupo
+        FROM pontos_utilizados pu
+        JOIN pontos_bolsao b ON pu.bolsao_id = b.id
+        ORDER BY pu.data_aplicacao DESC
+    ''')
+    conn.close()
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Pontos Utilizados'
+    ws.append(['Grupo', 'Serial', 'Cliente', 'Modelo', 'Pts/Dia', 'Data Aplicação', 'Data Fim'])
+    for r in rows_to_dicts(rows):
+        ws.append([r['grupo'], r['serial_number'], r['dados_cliente'], r['product_model'], r['valor_pontos_dia'], r['data_aplicacao'], r['data_fim']])
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name='relatorio_pontos_utilizados.xlsx')
+
+
+@app.route('/relatorios/conciliacao/exportar.pdf')
+@login_required
+def exportar_conciliacao_pdf():
+    conn = get_db_connection()
+    rows = fetch_all(conn, '''
+        SELECT pu.serial_number, b.responsavel || ' (' || b.projetos || ')' AS grupo,
+               COALESCE((SELECT SUM(bc.points) FROM base_conciliacao bc WHERE UPPER(TRIM(bc.serial_number)) = UPPER(TRIM(pu.serial_number))), 0) AS pontos_fortinet
+        FROM pontos_utilizados pu
+        JOIN pontos_bolsao b ON pu.bolsao_id = b.id
+        ORDER BY grupo, pu.serial_number
+    ''')
+    conn.close()
+    output = io.BytesIO()
+    c = canvas.Canvas(output, pagesize=A4)
+    y = 800
+    c.setFont('Helvetica-Bold', 12)
+    c.drawString(40, y, 'Relatorio de Conciliacao')
+    y -= 24
+    c.setFont('Helvetica', 9)
+    for r in rows_to_dicts(rows):
+        if y < 40:
+            c.showPage()
+            y = 800
+            c.setFont('Helvetica', 9)
+        c.drawString(40, y, f"Grupo: {r['grupo']} | Serial: {r['serial_number']} | Fortinet: {r['pontos_fortinet']}")
+        y -= 14
+    c.save()
+    output.seek(0)
+    return send_file(output, mimetype='application/pdf', as_attachment=True, download_name='relatorio_conciliacao.pdf')
 
 
 if __name__ == '__main__':

@@ -92,6 +92,7 @@
         <div class="login-erro">{{ erro }}</div>
         {% endif %}
         <form method="post" style="width:100%;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="usuario">Usuário</label>
                 <input type="text" name="usuario" id="usuario" required autofocus>

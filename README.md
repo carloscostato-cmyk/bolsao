@@ -161,6 +161,10 @@ Diferença   = Pontos Calculados − Pontos Fortinet
 ## Segurança
 
 - Todas as rotas protegidas com `@login_required` — sem login não acessa nada
+- Senhas armazenadas com hash `bcrypt` (sem senha em texto puro no banco)
+- Proteção CSRF em todos os formulários `POST`
+- Rate limit no login: bloqueio temporário após 5 tentativas inválidas
+- Perfis de acesso por usuário (`admin`, `viewer`), com rotas administrativas restritas
 - Queries com parâmetros `?` — proteção contra SQL injection
 - `secret_key` configurada para proteção de sessão Flask
 - WAL mode no SQLite — evita `database is locked` em produção
@@ -168,6 +172,20 @@ Diferença   = Pontos Calculados − Pontos Fortinet
 - Backups automáticos do arquivo `sistema.db` são gerados em `backups/` após cadastros e importações
 - Um backup de inicialização é gerado quando a aplicação sobe e encontra `sistema.db`
 - A rota administrativa de limpeza do banco fica desativada por padrão e só pode ser habilitada com `ALLOW_DB_RESET=1`
+
+### Logs (opção B escolhida)
+- Aplicar mascaramento de dados sensíveis nos logs (não registrar senha/token).
+- Manter logs de autenticação (sucesso/falha/bloqueio), ações administrativas e exportações.
+- Definir retenção mínima e rotação de arquivos para não crescer indefinidamente.
+- Validar acesso aos logs apenas para perfil `admin`.
+
+### Repositório privado no GitHub
+1. Abrir o repositório no GitHub.
+2. `Settings` > `General` > `Danger Zone`.
+3. Selecionar `Change repository visibility`.
+4. Escolher `Make private` e confirmar.
+
+> Essa ação é feita no GitHub (configuração da plataforma), não no código da aplicação.
 
 > Observação importante: backup local ajuda contra erro humano e falhas simples, mas não substitui um banco persistente fora do disco da aplicação. Em ambiente hospedado, o ideal é usar um disco persistente ou migrar para um banco gerenciado.
 

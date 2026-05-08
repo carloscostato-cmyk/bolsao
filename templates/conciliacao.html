@@ -89,6 +89,7 @@
             </h2>
 
             <form action="{{ url_for('conciliacao') }}" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="upload-box">
                     <div class="form-group" style="margin:0; flex:1;">
                         <label for="arquivo_conciliacao" style="margin-bottom:6px; display:block;">Arquivo Excel (.xlsx) exportado da Fortinet:</label>
@@ -103,6 +104,9 @@
             </form>
 
             <h2>Resultado da Conciliação</h2>
+            <div class="actions" style="margin-bottom:12px;">
+                <a href="{{ url_for('exportar_conciliacao_pdf') }}" class="button">Exportar PDF</a>
+            </div>
 
             {% if linhas %}
             <div class="legenda">
